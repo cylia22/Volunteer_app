@@ -1,0 +1,73 @@
+/* const Organization = require('../models/organization');
+const { cloudinary } = require("../cloudinary");
+
+
+module.exports.index = async (req, res) => {
+    const organizations = await Organization.find({}).populate('');
+    res.render('organizations/index', { organizations })
+}
+
+module.exports.renderNewForm = (req, res) => {
+    res.render('organizations/new');
+}
+
+
+
+module.exports.createOrganization = async (req, res, next) => {
+   
+    const organization = new Organization(req.body.organization);
+    organization.images = req.files.map(f => ({ url: f.path, filename: f.filename }));
+    organization.author = req.user._id;
+    await organization.save();
+    console.log(organization);
+    req.flash('success', 'Successfully added a new organization!');
+    res.redirect(`/organizations/${organization._id}`)
+}
+
+module.exports.showOrganization = async (req, res,) => {
+    const organization = await Organization.findById(req.params.id).populate({
+        path: 'reviews',
+        populate: {
+            path: 'author'
+        }
+    }).populate('author');
+    if (!organization) {
+        req.flash('error', 'Cannot find that organization!');
+        return res.redirect('/organizations');
+    }
+    res.render('organizations/show', { organization });
+}
+
+module.exports.renderEditForm = async (req, res) => {
+    const { id } = req.params;
+    const organization = await Organization.findById(id)
+    if (!organization) {
+        req.flash('error', 'Cannot find that organization!');
+        return res.redirect('/organizations');
+    }
+    res.render('organizations/edit', { organization });
+}
+
+module.exports.updateOrganization = async (req, res) => {
+    const { id } = req.params;
+    console.log(req.body);
+    const organization = await Organization.findByIdAndUpdate(id, { ...req.body.organization });
+    const imgs = req.files.map(f => ({ url: f.path, filename: f.filename }));
+    organization.images.push(...imgs);
+    await organization.save();
+    if (req.body.deleteImages) {
+        for (let filename of req.body.deleteImages) {
+            await cloudinary.uploader.destroy(filename);
+        }
+        await organization.updateOne({ $pull: { images: { filename: { $in: req.body.deleteImages } } } })
+    }
+    req.flash('success', 'Successfully updated organization!');
+    res.redirect(`/organizations/${organization._id}`)
+}
+
+module.exports.deleteOrganization = async (req, res) => {
+    const { id } = req.params;
+    await Organization.findByIdAndDelete(id);
+    req.flash('success', 'Successfully deleted organization')
+    res.redirect('/organizations');
+}
